@@ -142,17 +142,24 @@ def update_download_address(
     return parsed._replace(query=query)
 
 
-def build_variants(url: str, ip_groups: OrderedDict[str, list[str]]) -> list[str]:
-    """Build all Cloudflare variants for one VLESS URL."""
+def build_variants(
+    url: str,
+    ip_groups: OrderedDict[str, list[str]],
+    limit_per_route: int | None = None,
+) -> list[str]:
+    """Build Cloudflare variants, optionally limiting IPs used per route."""
     parsed = urllib.parse.urlsplit(url)
     query_index, extra = parse_download_settings(parsed)
     consumes_two = query_index is not None and extra is not None
     results: list[str] = []
 
     for route, addresses in ip_groups.items():
+        selected_addresses = (
+            addresses if limit_per_route is None else addresses[:limit_per_route]
+        )
         step = 2 if consumes_two else 1
-        for offset in range(0, len(addresses), step):
-            selected = addresses[offset : offset + step]
+        for offset in range(0, len(selected_addresses), step):
+            selected = selected_addresses[offset : offset + step]
             if len(selected) != step:
                 continue
 
@@ -178,6 +185,17 @@ def write_urls(path: Path, urls: Iterable[str]) -> int:
     return len(url_list)
 
 
+def positive_int(value: str) -> int:
+    """Parse a positive integer for argparse."""
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("必须是正整数") from exc
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("必须是正整数")
+    return parsed
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -190,6 +208,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "-o", "--output", default=DEFAULT_OUTPUT, help=f"输出文件（默认：{DEFAULT_OUTPUT}）"
+    )
+    parser.add_argument(
+        "--limit-per-route",
+        type=positive_int,
+        metavar="N",
+        help="每条线路最多使用的 IP 数量（默认：不限制）",
     )
     return parser.parse_args()
 
@@ -206,7 +230,9 @@ def main() -> int:
         results = [
             variant
             for source_url in source_urls
-            for variant in build_variants(source_url, ip_groups)
+            for variant in build_variants(
+                source_url, ip_groups, limit_per_route=args.limit_per_route
+            )
         ]
         count = write_urls(Path(args.output), results)
     except (OSError, ValueError) as exc:

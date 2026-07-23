@@ -76,6 +76,52 @@ class VlessReplaceCfTests(unittest.TestCase):
             ["192.0.2.1", "192.0.2.1"],
         )
 
+    def test_limits_ip_count_for_each_route(self):
+        groups = OrderedDict(
+            [
+                ("电信", ["192.0.2.1", "192.0.2.2", "192.0.2.3"]),
+                ("联通", ["198.51.100.1", "198.51.100.2"]),
+            ]
+        )
+
+        variants = MODULE.build_variants(
+            "vless://uuid@example.com:443#node", groups, limit_per_route=1
+        )
+
+        self.assertEqual(
+            [urllib.parse.urlsplit(item).hostname for item in variants],
+            ["192.0.2.1", "198.51.100.1"],
+        )
+
+    def test_limit_counts_ips_before_pairing_download_settings(self):
+        groups = OrderedDict(
+            [("电信", [f"192.0.2.{index}" for index in range(1, 7)])]
+        )
+        extra = urllib.parse.quote(
+            json.dumps({"downloadSettings": {"address": "old.example"}})
+        )
+
+        variants = MODULE.build_variants(
+            f"vless://uuid@example.com:443?extra={extra}#node",
+            groups,
+            limit_per_route=4,
+        )
+
+        self.assertEqual(len(variants), 2)
+        self.assertEqual(
+            [urllib.parse.urlsplit(item).hostname for item in variants],
+            ["192.0.2.1", "192.0.2.3"],
+        )
+        self.assertEqual(
+            [
+                json.loads(dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(item).query))["extra"])[
+                    "downloadSettings"
+                ]["address"]
+                for item in variants
+            ],
+            ["192.0.2.2", "192.0.2.4"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

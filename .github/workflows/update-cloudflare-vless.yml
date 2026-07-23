@@ -33,6 +33,7 @@ jobs:
         run: >-
           python3 vless-replace-cf.py
           --csv cloudflare_ips.csv
+          --limit-per-route 4
           --output vless_urls.txt
 
       - name: Merge and sync URLs to Gist
