@@ -1,0 +1,43 @@
+name: Update Cloudflare VLESS URLs
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+      timezone: "Asia/Shanghai"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: update-cloudflare-vless
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Fetch Cloudflare IPs
+        run: python3 fetch_cloudflare_ips.py --output cloudflare_ips.csv
+
+      - name: Generate VLESS URLs
+        env:
+          VLESS_URLS_BASE64: ${{ secrets.VLESS_URLS_BASE64 }}
+        run: >-
+          python3 vless-replace-cf.py
+          --csv cloudflare_ips.csv
+          --output vless_urls.txt
+
+      - name: Merge and sync URLs to Gist
+        env:
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          GIST_ID: ${{ secrets.GIST_ID }}
+          GIST_FILENAME: ${{ secrets.GIST_FILENAME }}
+        run: python3 sync_gist.py vless_urls.txt
