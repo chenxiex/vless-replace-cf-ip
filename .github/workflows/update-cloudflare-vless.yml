@@ -29,11 +29,12 @@ jobs:
 
       - name: Generate VLESS URLs
         env:
+          VLESS_LIMIT_PER_ROUTE: ${{ vars.VLESS_LIMIT_PER_ROUTE || '4' }}
           VLESS_URLS_BASE64: ${{ secrets.VLESS_URLS_BASE64 }}
         run: >-
           python3 vless-replace-cf.py
           --csv cloudflare_ips.csv
-          --limit-per-route 4
+          --limit-per-route "$VLESS_LIMIT_PER_ROUTE"
           --output vless_urls.txt
 
       - name: Merge and sync URLs to Gist
