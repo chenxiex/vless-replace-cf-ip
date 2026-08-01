@@ -123,6 +123,28 @@ def parse_download_settings(parsed: urllib.parse.SplitResult) -> tuple[int | Non
     return None, None
 
 
+def outer_address_uses_tls(parsed: urllib.parse.SplitResult) -> bool:
+    """Return whether the URL's outer address belongs to a TLS group."""
+    if parsed.hostname is None:
+        return False
+    return any(
+        key == "security" and value.casefold() == "tls"
+        for key, value in urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
+    )
+
+
+def download_address_uses_tls(extra: dict | None) -> bool:
+    """Return whether downloadSettings has an address protected by TLS."""
+    if extra is None:
+        return False
+    settings = extra["downloadSettings"]
+    return (
+        "address" in settings
+        and isinstance(settings.get("security"), str)
+        and settings["security"].casefold() == "tls"
+    )
+
+
 def update_download_address(
     parsed: urllib.parse.SplitResult,
     query_index: int,
@@ -150,23 +172,33 @@ def build_variants(
     """Build Cloudflare variants, optionally limiting IPs used per route."""
     parsed = urllib.parse.urlsplit(url)
     query_index, extra = parse_download_settings(parsed)
-    consumes_two = query_index is not None and extra is not None
+    replace_outer = outer_address_uses_tls(parsed)
+    replace_download = download_address_uses_tls(extra)
+    addresses_per_variant = int(replace_outer) + int(replace_download)
+    if addresses_per_variant == 0:
+        return [url]
+
     results: list[str] = []
 
     for route, addresses in ip_groups.items():
         selected_addresses = (
             addresses if limit_per_route is None else addresses[:limit_per_route]
         )
-        step = 2 if consumes_two else 1
+        step = addresses_per_variant
         for offset in range(0, len(selected_addresses), step):
             selected = selected_addresses[offset : offset + step]
             if len(selected) != step:
                 continue
 
-            variant = replace_url_host(parsed, selected[0])
-            if consumes_two:
+            variant = parsed
+            selected_index = 0
+            if replace_outer:
+                variant = replace_url_host(variant, selected[selected_index])
+                selected_index += 1
+            if replace_download:
+                assert query_index is not None and extra is not None
                 variant = update_download_address(
-                    variant, query_index, extra, selected[1]
+                    variant, query_index, extra, selected[selected_index]
                 )
 
             sequence = offset // step + 1
