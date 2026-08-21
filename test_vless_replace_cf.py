@@ -84,7 +84,7 @@ class VlessReplaceCfTests(unittest.TestCase):
             ["192.0.2.1", "192.0.2.1"],
         )
 
-    def test_limits_ip_count_for_each_route(self):
+    def test_limits_generated_url_count_for_each_route(self):
         groups = OrderedDict(
             [
                 ("电信", ["192.0.2.1", "192.0.2.2", "192.0.2.3"]),
@@ -103,9 +103,9 @@ class VlessReplaceCfTests(unittest.TestCase):
             ["192.0.2.1", "198.51.100.1"],
         )
 
-    def test_limit_counts_ips_before_pairing_download_settings(self):
+    def test_limit_counts_urls_when_each_variant_uses_two_ips(self):
         groups = OrderedDict(
-            [("电信", [f"192.0.2.{index}" for index in range(1, 7)])]
+            [("电信", [f"192.0.2.{index}" for index in range(1, 11)])]
         )
         extra = urllib.parse.quote(
             json.dumps(
@@ -124,10 +124,10 @@ class VlessReplaceCfTests(unittest.TestCase):
             limit_per_route=4,
         )
 
-        self.assertEqual(len(variants), 2)
+        self.assertEqual(len(variants), 4)
         self.assertEqual(
             [urllib.parse.urlsplit(item).hostname for item in variants],
-            ["192.0.2.1", "192.0.2.3"],
+            ["192.0.2.1", "192.0.2.3", "192.0.2.5", "192.0.2.7"],
         )
         self.assertEqual(
             [
@@ -136,7 +136,7 @@ class VlessReplaceCfTests(unittest.TestCase):
                 ]["address"]
                 for item in variants
             ],
-            ["192.0.2.2", "192.0.2.4"],
+            ["192.0.2.2", "192.0.2.4", "192.0.2.6", "192.0.2.8"],
         )
 
     def test_only_outer_tls_address_is_replaced(self):

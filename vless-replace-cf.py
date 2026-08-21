@@ -169,7 +169,7 @@ def build_variants(
     ip_groups: OrderedDict[str, list[str]],
     limit_per_route: int | None = None,
 ) -> list[str]:
-    """Build Cloudflare variants, optionally limiting IPs used per route."""
+    """Build Cloudflare variants, optionally limiting URLs generated per route."""
     parsed = urllib.parse.urlsplit(url)
     query_index, extra = parse_download_settings(parsed)
     replace_outer = outer_address_uses_tls(parsed)
@@ -182,7 +182,9 @@ def build_variants(
 
     for route, addresses in ip_groups.items():
         selected_addresses = (
-            addresses if limit_per_route is None else addresses[:limit_per_route]
+            addresses
+            if limit_per_route is None
+            else addresses[: limit_per_route * addresses_per_variant]
         )
         step = addresses_per_variant
         for offset in range(0, len(selected_addresses), step):
@@ -245,7 +247,7 @@ def parse_args() -> argparse.Namespace:
         "--limit-per-route",
         type=positive_int,
         metavar="N",
-        help="每条线路最多使用的 IP 数量（默认：不限制）",
+        help="每个源 URL 在每条线路最多生成的 URL 数量（默认：不限制）",
     )
     return parser.parse_args()
 
