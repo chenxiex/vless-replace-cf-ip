@@ -45,6 +45,19 @@ class SyncGistTests(unittest.TestCase):
         url = "vless://uuid@example.com:443"
         self.assertEqual(MODULE.merge_urls(f"{url}\n", f"{url}\n"), f"{url}\n")
 
+    def test_source_url_and_generated_variant_sync_together(self):
+        remote_source = vless("node", "old.example")
+        local_source = vless("node", "new.example")
+        generated = vless("node-cf-电信-1", "192.0.2.1")
+
+        self.assertEqual(
+            MODULE.merge_urls(
+                f"{remote_source}\n",
+                f"{local_source}\n{generated}\n",
+            ).splitlines(),
+            [local_source, generated],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,6 +1,10 @@
+import base64
 import csv
 import importlib.util
 import json
+import os
+import subprocess
+import sys
 import tempfile
 import unittest
 import urllib.parse
@@ -217,6 +221,51 @@ class VlessReplaceCfTests(unittest.TestCase):
         variants = MODULE.build_variants(source, self.groups)
 
         self.assertEqual(variants, [source])
+
+    def test_include_source_urls_option_preserves_sources_without_duplicates(self):
+        tls_source = "vless://uuid@origin.example:443?security=tls#tls-node"
+        other_source = "vless://uuid@other.example:443?security=reality#other-node"
+        encoded = base64.b64encode(
+            f"{tls_source}\n{other_source}\n".encode("utf-8")
+        ).decode("ascii")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            csv_path = Path(temp_dir) / "ips.csv"
+            csv_path.write_text("线路,IP\n电信,192.0.2.1\n", encoding="utf-8")
+            output_path = Path(temp_dir) / "urls.txt"
+            command = [
+                sys.executable,
+                str(SCRIPT),
+                "--csv",
+                str(csv_path),
+                "--output",
+                str(output_path),
+            ]
+            environment = {**os.environ, MODULE.URLS_ENV_VAR: encoded}
+
+            subprocess.run(command, env=environment, check=True, capture_output=True)
+            self.assertEqual(
+                output_path.read_text(encoding="utf-8").splitlines(),
+                [
+                    "vless://uuid@192.0.2.1:443?security=tls#tls-node-cf-电信-1",
+                    other_source,
+                ],
+            )
+
+            subprocess.run(
+                command + ["--include-source-urls"],
+                env=environment,
+                check=True,
+                capture_output=True,
+            )
+            self.assertEqual(
+                output_path.read_text(encoding="utf-8").splitlines(),
+                [
+                    tls_source,
+                    "vless://uuid@192.0.2.1:443?security=tls#tls-node-cf-电信-1",
+                    other_source,
+                ],
+            )
 
 
 if __name__ == "__main__":

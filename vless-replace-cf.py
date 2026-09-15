@@ -249,6 +249,11 @@ def parse_args() -> argparse.Namespace:
         metavar="N",
         help="每个源 URL 在每条线路最多生成的 URL 数量（默认：不限制）",
     )
+    parser.add_argument(
+        "--include-source-urls",
+        action="store_true",
+        help="在输出中保留 Base64 解码后的源 URL（默认：仅输出替换结果）",
+    )
     return parser.parse_args()
 
 
@@ -261,13 +266,16 @@ def main() -> int:
 
         ip_groups = read_ip_groups(Path(args.csv))
         source_urls = decode_vless_urls(encoded_urls)
-        results = [
-            variant
-            for source_url in source_urls
-            for variant in build_variants(
+        results = []
+        for source_url in source_urls:
+            variants = build_variants(
                 source_url, ip_groups, limit_per_route=args.limit_per_route
             )
-        ]
+            if args.include_source_urls:
+                results.append(source_url)
+            for variant in variants:
+                if not args.include_source_urls or variant != source_url:
+                    results.append(variant)
         count = write_urls(Path(args.output), results)
     except (OSError, ValueError) as exc:
         print(f"错误：{exc}", file=sys.stderr)
