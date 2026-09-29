@@ -25,6 +25,10 @@ class VlessReplaceCfTests(unittest.TestCase):
             [("电信", ["192.0.2.1", "192.0.2.2"]), ("联通", ["198.51.100.1"])]
         )
 
+    def test_ip_header_prefers_exact_match_then_containing_match(self):
+        self.assertEqual(MODULE.find_ip_header(["IP地址", " ip "]), " ip ")
+        self.assertEqual(MODULE.find_ip_header(["名称", "IP地址", "优选IP"]), "IP地址")
+
     def test_reads_fetcher_csv_headers(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             csv_path = Path(temp_dir) / "ips.csv"
@@ -36,6 +40,16 @@ class VlessReplaceCfTests(unittest.TestCase):
             self.assertEqual(
                 MODULE.read_ip_groups(csv_path),
                 OrderedDict([("电信", ["192.0.2.1"])]),
+            )
+
+    def test_uses_unknown_route_when_csv_has_no_route_column(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            csv_path = Path(temp_dir) / "ips.csv"
+            csv_path.write_text("优选IP,延迟\n192.0.2.1,10ms\n192.0.2.2,20ms\n", encoding="utf-8")
+
+            self.assertEqual(
+                MODULE.read_ip_groups(csv_path),
+                OrderedDict([("未知", ["192.0.2.1", "192.0.2.2"])]),
             )
 
     def test_url_without_download_settings_consumes_one_ip(self):

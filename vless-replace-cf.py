@@ -22,16 +22,16 @@ URLS_ENV_VAR = "VLESS_URLS_BASE64"
 
 
 def find_ip_header(fieldnames: list[str]) -> str:
-    """Find an IP column, accepting IP, ip, and names such as 优选IP."""
+    """Find an exact IP column first, then one containing IP."""
     exact_matches = [name for name in fieldnames if name.strip().casefold() == "ip"]
     if exact_matches:
         return exact_matches[0]
 
-    suffix_matches = [name for name in fieldnames if name.strip().casefold().endswith("ip")]
-    if suffix_matches:
-        return suffix_matches[0]
+    containing_matches = [name for name in fieldnames if "ip" in name.strip().casefold()]
+    if containing_matches:
+        return containing_matches[0]
 
-    raise ValueError("CSV 表头中未找到 IP 列（字段名应为 IP、ip 或以 IP 结尾）")
+    raise ValueError("CSV 表头中未找到 IP 列（字段名应为 IP、ip 或包含 IP）")
 
 
 def read_ip_groups(path: Path) -> OrderedDict[str, list[str]]:
@@ -43,17 +43,14 @@ def read_ip_groups(path: Path) -> OrderedDict[str, list[str]]:
 
         fieldnames = [name.strip() for name in reader.fieldnames]
         ip_header = find_ip_header(fieldnames)
-        try:
-            route_header = next(name for name in fieldnames if name == "线路")
-        except StopIteration as exc:
-            raise ValueError("CSV 表头中未找到“线路”列") from exc
+        route_header = "线路" if "线路" in fieldnames else None
 
         groups: OrderedDict[str, list[str]] = OrderedDict()
         for line_number, raw_row in enumerate(reader, start=2):
             row = {(key or "").strip(): (value or "").strip() for key, value in raw_row.items()}
             ip = row.get(ip_header, "")
-            route = row.get(route_header, "")
-            if not ip and not route:
+            route = row.get(route_header, "") if route_header is not None else "未知"
+            if not ip and (route_header is None or not route):
                 continue
             if not ip or not route:
                 raise ValueError(f"CSV 第 {line_number} 行的 IP 或线路为空")
